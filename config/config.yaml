@@ -1,0 +1,24 @@
+mode: "mock" # "mock" or "mock_llm" or "mock_jira" or "live"
+
+jira:
+  base_url: "https://jira.yourcompany.com"
+  project_key: "CORE"
+  username: "your_jira_user"
+  api_token: "your_jira_api_token"
+
+llm:
+  base_url: "http://localhost:8000"
+  endpoint: "/generate-jira"
+  timeout: 10
+  prompt_path: "resources/generate_jira_task.md"
+
+ui:
+  issue_types:
+    - Task
+    - Bug
+    - Story
+  components:
+    - Core
+    - UI
+    - API Integration Layer
+    - Machine Learning Pipeline

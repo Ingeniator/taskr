@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Unique identifier for your LaunchAgent -->
+    <key>Label</key>
+    <string>com.ingeniator.jiraquicktask</string>
+
+    <!-- The command to launch: must be exact path to .app binary -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/JiraQuickTask.app/Contents/MacOS/JiraQuickTask</string>
+    </array>
+
+    <!-- Launch at user login -->
+    <key>RunAtLoad</key>
+    <true/>
+
+    <!-- Do not restart automatically if the user quits the app -->
+    <key>KeepAlive</key>
+    <false/>
+
+    <!-- Log standard output and error -->
+    <key>StandardOutPath</key>
+    <string>/tmp/jiraquicktask.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/jiraquicktask.err</string>
+</dict>
+</plist>

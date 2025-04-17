@@ -1,0 +1,19 @@
+[project]
+name = "taskr"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "httpx>=0.28.1",
+    "jira>=3.8.0",
+    "pyinstaller>=6.12.0",
+    "pynput>=1.8.1",
+    "pyqt5>=5.15.11",
+    "sips>=0.14.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest-custom-report>=1.0.1",
+]
