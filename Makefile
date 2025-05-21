@@ -1,8 +1,21 @@
 APP_NAME=JiraQuickTask
-APP_BUNDLE=dist/$(APP_NAME).app
+DIST_DIR := dist
+APP_BUNDLE=$(DIST_DIR)//$(APP_NAME).app
 DEST_APP=/Applications/$(APP_NAME).app
 PLIST_SOURCE=./com.ingeniator.jiraquicktask.plist
 PLIST_DEST=$(HOME)/Library/LaunchAgents/com.ingeniator.jiraquicktask.plist
+DMG_NAME := $(APP_NAME)-Installer.dmg
+DMG_SETTINGS := dmg_settings.py
+
+.PHONY: dmg clean-dmg install build uninstall rebuild
+
+dmg: $(DIST_DIR)/$(DMG_NAME)
+
+$(DIST_DIR)/$(DMG_NAME): $(DMG_SETTINGS) $(APP_BUNDLE)
+	uv run dmgbuild -s $(DMG_SETTINGS) "$(APP_NAME) Installer" $@
+
+clean-dmg:
+	rm -f $(DIST_DIR)/$(DMG_NAME)
 
 install: build
 	@set -x
@@ -18,7 +31,7 @@ install: build
 
 build:
 	@echo "🔧 Building app with pyinstaller..."
-	@uv run pyinstaller --windowed --onefile --name $(APP_NAME) launch_jira.py
+	@uv run pyinstaller --windowed --add-data "config/config.yaml:config" --onefile --name $(APP_NAME) launch_jira.py
 
 	@echo "🩹 Patching .spec with icon and LSUIElement..."
 	@uv run python scripts/patch_spec.py
@@ -42,4 +55,5 @@ rebuild:
 	@killall $(APP_NAME) 2>/dev/null || true
 	@echo "♻️ Rebuilding $(APP_NAME)..."
 	@rm -rf build/ dist/ *.spec
-	@$(MAKE) install
+	@$(MAKE) build
+	@./dist/JiraQuickTask

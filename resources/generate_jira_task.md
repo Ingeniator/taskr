@@ -19,14 +19,12 @@ Brief explanation of the task. What needs to be done and why?
 What triggered this task? Is it related to a bug, a feature request, a customer need, or a refactor?
 
 ## Acceptance Criteria / Definition of Done
-- [ ] Clear and testable success condition 1
-- [ ] Outcome or deliverable 2
+- [ ] Clear and testable success condition
+- [ ] Outcome or deliverable
 - [ ] Optional edge cases or error handling
-
 ## Links & References
 - [Jira ticket / Design doc / PRD](https://)
 - Related tickets: ABC-123, XYZ-456
-
 RULES
 
 Infer the most appropriate "type":

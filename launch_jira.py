@@ -67,13 +67,13 @@ def main():
     # Start hotkey listener in thread
     def listener():
         with keyboard.GlobalHotKeys({
-            '<cmd>+<shift>+j': trigger_launcher
+            '<cmd>+<shift>+/': trigger_launcher
         }) as h:
             h.join()
 
     threading.Thread(target=listener, daemon=True).start()
 
-    print("✅ Hotkey is ready: Cmd + Shift + J")
+    print("✅ Hotkey is ready: Cmd + Shift + /")
     sys.exit(app.exec_())
 
 sys.stderr = open("/tmp/jiraquicktask.err", "w")
