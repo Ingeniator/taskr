@@ -6,12 +6,13 @@ PLIST_SOURCE=./com.ingeniator.jiraquicktask.plist
 PLIST_DEST=$(HOME)/Library/LaunchAgents/com.ingeniator.jiraquicktask.plist
 DMG_NAME := $(APP_NAME)-Installer.dmg
 DMG_SETTINGS := dmg_settings.py
+RELEASE_DIR := release
 
 .PHONY: dmg clean-dmg install build uninstall rebuild
 
-dmg: $(DIST_DIR)/$(DMG_NAME)
+dmg: $(RELEASE_DIR)/$(DMG_NAME)
 
-$(DIST_DIR)/$(DMG_NAME): $(DMG_SETTINGS) $(APP_BUNDLE)
+$(RELEASE_DIR)/$(DMG_NAME): $(DMG_SETTINGS) $(APP_BUNDLE)
 	uv run dmgbuild -s $(DMG_SETTINGS) "$(APP_NAME) Installer" $@
 
 clean-dmg:
@@ -31,7 +32,8 @@ install: build
 
 build:
 	@echo "🔧 Building app with pyinstaller..."
-	@uv run pyinstaller --windowed --add-data "config/config.yaml:config" --onefile --name $(APP_NAME) launch_jira.py
+	@test -f config/config.yaml || (echo "❌ Missing config/config.yaml!" && false)
+	@uv run pyinstaller --windowed --add-data "config:config" --onefile --name $(APP_NAME) launch_jira.py
 
 	@echo "🩹 Patching .spec with icon and LSUIElement..."
 	@uv run python scripts/patch_spec.py
