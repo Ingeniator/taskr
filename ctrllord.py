@@ -15,7 +15,6 @@ from ui.launcher import CtrlLord
 
 import subprocess
 from ApplicationServices import AXIsProcessTrustedWithOptions
-import objc
 
 def show_permission_dialog():
     app = QApplication.instance() or QApplication(sys.argv)
@@ -28,7 +27,7 @@ def show_permission_dialog():
         QMessageBox.Ok
     )
 
-def is_process_trusted(prompt=True):
+def is_process_trusted(prompt=False):
     options = { "AXTrustedCheckOptionPrompt": prompt }
     return AXIsProcessTrustedWithOptions(options)
 
