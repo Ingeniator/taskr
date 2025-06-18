@@ -2,7 +2,11 @@ import yaml
 import os
 import sys
 import shutil
-CONFIG_PATH = os.path.expanduser("~/Library/Application Support/JiraQuickTask/config.yaml")
+from platformdirs import user_config_path
+CONFIG_DIR = user_config_path(appname="CtrlLord", appauthor="CtrlLord")
+CONFIG_PATH = os.path.join(CONFIG_DIR, "config.yaml")
+# Ensure the config directory exists
+os.makedirs(CONFIG_DIR, exist_ok=True)
 
 def get_resource_path(rel_path):
     if hasattr(sys, '_MEIPASS'):

@@ -56,3 +56,7 @@ class JiraService:
             }
         except RequestException as e:
             raise RuntimeError(f"Jira request failed: {e}")
+
+    def reload_config(self):
+        self.config = load_config()
+        print("🔄 JiraService config reloaded.")

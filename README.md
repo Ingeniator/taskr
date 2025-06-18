@@ -21,6 +21,7 @@ A lightweight, macOS-style launcher built with **PyQt5** that allows you to quic
 ## 🛠️ Installation
 
 ```bash
+brew install jpeg webp zlib libtiff freetype little-cms2
 pip install -r requirements.txt
 ```
 Make sure you have Python 3.8+ and PyQt5 installed.
@@ -61,13 +62,13 @@ ui:
 ## 🚀 Usage
 
 ```bash
-python main.py
+python ctrllord.py
 ```
 
 - Press Cmd + Shift + J to open the launcher.
 - Type a quick summary (or prefilled from your clipboard).
 - Hit Enter to generate full task details.
-- Press Ctrl + Enter to submit to Jira.
+- Press Shift + Enter to submit to Jira.
 - The task key is copied to clipboard and a toast appears.
 
 ## 🧪 Mock Mode

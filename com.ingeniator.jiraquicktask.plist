@@ -5,12 +5,12 @@
 <dict>
     <!-- Unique identifier for your LaunchAgent -->
     <key>Label</key>
-    <string>com.ingeniator.jiraquicktask</string>
+    <string>com.ingeniator.ctrllord</string>
 
     <!-- The command to launch: must be exact path to .app binary -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/JiraQuickTask.app/Contents/MacOS/JiraQuickTask</string>
+        <string>/Applications/CtrlLord.app/Contents/MacOS/CtrlLord</string>
     </array>
 
     <!-- Launch at user login -->
@@ -23,8 +23,8 @@
 
     <!-- Log standard output and error -->
     <key>StandardOutPath</key>
-    <string>/tmp/jiraquicktask.log</string>
+    <string>/tmp/ctrllord.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/jiraquicktask.err</string>
+    <string>/tmp/ctrllord.err</string>
 </dict>
 </plist>

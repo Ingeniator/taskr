@@ -1,11 +1,11 @@
 # dmg_settings.py
 import os
 
-application = "JiraQuickTask"
+application = "CtrlLord"
 
 # Files to include
 files = [
-    "dist/JiraQuickTask.app",
+    "dist/CtrlLord.app",
 ]
 
 # Create a symbolic link to /Applications
@@ -15,7 +15,7 @@ symlinks = {
 
 # Icon locations in the DMG window
 icon_locations = {
-    "JiraQuickTask.app": (140, 120),
+    "CtrlLord.app": (140, 120),
     "Applications": (380, 120)
 }
 

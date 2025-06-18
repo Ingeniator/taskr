@@ -1,17 +1,17 @@
 # ui/launcher.py
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QApplication,
     QWidget, QVBoxLayout, QHBoxLayout,
-    QLabel, QLineEdit, QTextEdit, QComboBox, 
+    QLabel, QLineEdit, QTextEdit, QComboBox, QToolButton,
     QStyle, QStyledItemDelegate, QStyleOptionViewItem, 
-    QGraphicsDropShadowEffect, QDesktopWidget
-    )
-from PyQt5.QtCore import Qt, QTimer, pyqtSlot
-from PyQt5.QtGui import (
-    QFont, QClipboard, QColor,
-    QTextCharFormat, QTextCursor    
-    )
+    QGraphicsDropShadowEffect, QSystemTrayIcon, QMenu
+)
+from PySide6.QtCore import Qt, QTimer, Slot, QEvent
+from PySide6.QtGui import (
+    QFont, QClipboard, QColor, QIcon, QAction, QCursor,
+    QTextCharFormat, QTextCursor, QGuiApplication   
+)
 
 from services.parser import parse_task_text
 from services.jira_service import JiraService
@@ -20,9 +20,17 @@ from services.config import load_config
 
 from ui.toast import ToastMessage
 from ui.styles import NoCheckmarkBoldSelectedDelegate
+from ui.config import ConfigEditorDialog
 
+import os
+import sys
 
-class JiraQuickTask(QWidget):
+def resource_path(rel_path):
+    if hasattr(sys, "_MEIPASS"):
+        return os.path.join(sys._MEIPASS, rel_path)
+    return os.path.join(os.path.abspath("."), rel_path)
+
+class CtrlLord(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -35,9 +43,35 @@ class JiraQuickTask(QWidget):
         self.generator = TaskGeneratorService()
         self.jira = JiraService()
         self.init_ui()
+        self.create_tray()
     
+    def create_tray(self):
+        # Load tray icon
+        tray_icon_path = resource_path("resources/icon.png")
+        icon = QIcon(tray_icon_path)
+        if icon.isNull():
+            print("❌ Failed to load tray icon!")
+        self.tray = QSystemTrayIcon(self)
+        self.tray.setIcon(icon)
+        self.tray.setToolTip("CtrlLord")
+
+        menu = QMenu(self)
+        open_action = QAction("📝 Create Task", self)
+        open_action.triggered.connect(self.show_launcher)
+        menu.addAction(open_action)
+        menu.addSeparator()
+        settings_action = QAction("⚙️ Settings", self)
+        settings_action.triggered.connect(self.show_config)
+        menu.addAction(settings_action)
+        menu.addSeparator()
+        quit_action = QAction("❌ Quit", self)
+        quit_action.triggered.connect(QApplication.quit)
+        menu.addAction(quit_action)
+        self.tray.setContextMenu(menu)
+        self.tray.setVisible(True)
+
     def eventFilter(self, obj, event):
-        if event.type() == event.KeyPress:
+        if event.type() == QEvent.Type.KeyPress:
             if event.key() == Qt.Key_Escape:
                 self.reset_ui()
                 return True
@@ -74,6 +108,17 @@ class JiraQuickTask(QWidget):
         self.input.setFocus()
         self.step = 0
         self.hide()
+
+    def refresh_from_config(self):
+        config = load_config()
+        self.jira.reload_config()
+        issue_types = config["ui"]["issue_types"]
+        components = config["ui"]["components"]
+        print("🔄 UI reloading categories…")
+        self.type_dropdown.clear()
+        self.type_dropdown.addItems(config["ui"]["issue_types"])
+        self.component_dropdown.clear()
+        self.component_dropdown.addItems(config["ui"]["components"])
 
     def init_ui(self):
         self.layout = QVBoxLayout()
@@ -122,7 +167,7 @@ class JiraQuickTask(QWidget):
         self.details_section.setGraphicsEffect(shadow)
 
         # hint
-        hint = QLabel("Press Ctrl+Enter to submit")
+        hint = QLabel("Press Shift+Enter to submit")
         hint.setStyleSheet("color: #888; font-size: 11px; padding-top: 10px; padding-left: 20px;")
         self.details_layout.addWidget(hint)
 
@@ -147,15 +192,10 @@ class JiraQuickTask(QWidget):
         self.component_layout.setContentsMargins(20, 0, 20, 0)
         self.component_layout.setSpacing(6)
 
-        config = load_config()
-        issue_types = config["ui"]["issue_types"]
-        components = config["ui"]["components"]
-
         # Issue Type line
         type_label = QLabel("Type:")
         type_label.setFont(QFont("Helvetica Neue", 13))
         self.type_dropdown = QComboBox()
-        self.type_dropdown.addItems(issue_types)
         self.type_dropdown.setItemDelegate(NoCheckmarkBoldSelectedDelegate(self.type_dropdown))
         self.type_dropdown.setStyleSheet("""
             QComboBox {
@@ -184,13 +224,30 @@ class JiraQuickTask(QWidget):
 
         # Component dropdown
         self.component_dropdown = QComboBox()
-        self.component_dropdown.addItems(components)
         self.component_dropdown.setItemDelegate(NoCheckmarkBoldSelectedDelegate(self.component_dropdown))
         self.component_dropdown.setStyleSheet(self.type_dropdown.styleSheet())
         
         self.component_layout.addWidget(label)
         self.component_layout.addWidget(self.component_dropdown)
         self.component_layout.addStretch()
+        # # ➕ Add config button (bottom-right)
+        # self.config_button = QToolButton()
+        # self.config_button.setText("⚙️")
+        # self.config_button.setToolTip("Edit Configuration")
+        # self.config_button.setCursor(Qt.PointingHandCursor)
+        # self.config_button.setStyleSheet("""
+        #     QToolButton {
+        #         background: transparent;
+        #         border: none;
+        #         padding: 0px;
+        #         font-size: 14px;
+        #     }
+        #     QToolButton:hover {
+        #         color: #555;
+        #     }
+        # """)
+        # self.config_button.clicked.connect(self.show_config)
+        # self.component_layout.addWidget(self.config_button)
 
         self.details_layout.addWidget(self.component_line)
         self.details_section.setLayout(self.details_layout)
@@ -199,6 +256,8 @@ class JiraQuickTask(QWidget):
         # Add widgets to main layout
         self.layout.addWidget(self.input)
         self.layout.addWidget(self.details_section)
+
+        self.refresh_from_config()
 
     def handle_enter(self):
         if self.step == 0:
@@ -288,13 +347,22 @@ class JiraQuickTask(QWidget):
 
         self.toast = toast  # Keep reference alive!
 
-
-    @pyqtSlot()
-    def show_launcher(self):
-        screen = QDesktopWidget().availableGeometry()
+    def fix_screen_position(self):
+        screen = QGuiApplication.primaryScreen().availableGeometry()
         x = (screen.width() - self.width()) // 2
         y = int(screen.height() * 0.2)  # top 20% of screen
         self.move(x, y)
+
+    @Slot()
+    def show_config(self):
+        self.fix_screen_position()
+        dialog = ConfigEditorDialog(self)
+        if dialog.exec():  # Will return True if dialog was accepted
+            self.refresh_from_config()
+
+    @Slot()
+    def show_launcher(self):
+        self.fix_screen_position()
 
         # 🔥 Pre-fill from clipboard
         if not self.input.text().strip():
