@@ -13,10 +13,10 @@ ARCHFLAGS := "-arch arm64 -arch x86_64"
 .PHONY: venv dmg clean-dmg install build uninstall rebuild
 
 venv:
-	python3 -m venv venv && . venv/bin/activate && \
-	ARCHFLAGS="-arch arm64 -arch x86_64" pip install --no-binary :all: pyyaml
+	python3 -m venv venv && . venv/bin/activate
 
 dmg: $(RELEASE_DIR)/$(DMG_NAME)
+	@tar -cvf - ./release/CtrlLord-Installer.dmg | split -b 25m -d - "archive_part_"
 
 $(RELEASE_DIR)/$(DMG_NAME): $(DMG_SETTINGS) $(APP_BUNDLE)
 	mkdir -p ./release && uv run dmgbuild -s $(DMG_SETTINGS) "$(APP_NAME) Installer" $@
@@ -36,16 +36,14 @@ install: build
 	@launchctl bootstrap gui/$(shell id -u) "$(PLIST_DEST)" || (echo "❌ Bootstrap failed! Check logs or quarantine flags." && false)
 	@echo "✅ Installed and loaded LaunchAgent for app."
 
-build: prebuild $(APP_BUNDLE)
-
-prebuild:
-	@ARCHFLAGS="-arch arm64 -arch x86_64" uv pip install --force-reinstall --no-binary :all: pyyaml
-	@ARCHFLAGS="-arch arm64 -arch x86_64" uv pip install --force-reinstall --no-binary :all: Pillow
+build: 
+	@ARCHFLAGS="-arch arm64 -arch x86_64" WRAPT_EXTENSIONS=false uv pip install --force-reinstall --no-binary :all: wrapt
+	@$(MAKE) $(APP_BUNDLE)
 
 # ➊ Первая фаза – генерация .spec без onefile
 $(APP_NAME).spec: ctrllord.py
 	@echo "🔧 Building app with pyinstaller..."
-	@test -f config/config.yaml || (echo "❌ Missing config/config.yaml!" && false)
+	@test -f config/config.toml || (echo "❌ Missing config/config.toml!" && false)
 	@echo "🔧 (phase 1) generate spec..."
 	@uv run pyinstaller \
 		--noconfirm \

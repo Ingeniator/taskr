@@ -1,4 +1,4 @@
-import yaml
+import toml
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QPlainTextEdit, QPushButton, QMessageBox
 )
@@ -32,12 +32,17 @@ class ConfigEditorDialog(QDialog):
 
     def save_config(self):
         try:
-            yaml.safe_load(self.editor.toPlainText())  # validate YAML
-            with open(self.config_path, "w") as f:
-                f.write(self.editor.toPlainText())
+            content = self.editor.toPlainText()
+            # Validate TOML content
+            toml.loads(content)  # raises toml.TomlDecodeError if invalid
+
+            with open(self.config_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
             print("✅ Configuration saved.")
-            self.accept() 
-        except yaml.YAMLError as e:
-            QMessageBox.warning(self, "YAML Error", f"Invalid YAML:\n{e}")
+            self.accept()
+
+        except toml.TomlDecodeError as e:
+            QMessageBox.warning(self, "TOML Error", f"Invalid TOML:\n{e}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Could not save config:\n{e}")

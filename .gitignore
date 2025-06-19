@@ -177,3 +177,4 @@ cython_debug/
 resources_rc.py
 .DS_Store
 release/CtrlLord-Installer.dmg
+archive_part_*

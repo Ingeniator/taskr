@@ -1,7 +1,7 @@
 # jira_service.py
 import random
 import time
-from jira import JIRA
+from atlassian import Jira
 
 from services.config import load_config
 
@@ -11,14 +11,12 @@ class JiraService:
         self.base_url = self.config["jira"]["base_url"]
         self.project_key = self.config["jira"]["project_key"]
 
-        self.mode = self.config.get("mode", "mock").lower()
+        self.mode = self.config["general"].get("mode", "mock").lower()
         if self.mode in ("mock_llm", "live"):
-            self.client = JIRA(
-                server=self.config["jira"]["base_url"],
-                basic_auth=(
-                    self.config["jira"]["username"],
-                    self.config["jira"]["api_token"]
-                )
+            self.client = Jira(
+                url=self.config["jira"]["base_url"],
+                username=self.config["jira"]["username"],
+                api_token=self.config["jira"]["api_token"]
             )
 
     def generate_mock_task(self, summary: str, description: str, issue_type: str, component: str) -> dict:
@@ -39,13 +37,13 @@ class JiraService:
 
         # Live mode: create real Jira issue 
         try:
-            issue = self.client.create_issue(
-                project=self.project_key,
-                summary=summary,
-                description=description,
-                issuetype={"name": issue_type},
-                components=[{"name": component}]
-            )
+            issue = self.client.create_issue(fields={
+                "project": {"key": self.project_key},
+                "summary": summary,
+                "description": description,
+                "issuetype": {"name": issue_type},
+                "components": [{"name": component}]
+            })
             return {
                 "key": issue.key,
                 "summary": summary,

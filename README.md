@@ -28,35 +28,27 @@ Make sure you have Python 3.8+ and PyQt5 installed.
 
 ## ⚙️ Configuration
 
-Create a config file at config/config.yaml:
+Create a config file at config/config.toml:
 
-```yaml
-mode: "mock"  # change to "live" for real Jira/LLM
+```toml
+[general]
+mode = "mock"  # "mock", "mock_llm", "mock_jira", or "live"
 
-jira:
-  base_url: "https://yourcompany.atlassian.net"
-  project_key: "CORE"
-  username: "your_email@company.com"
-  api_token: "your_api_token"
+[jira]
+base_url = "https://jira.yourcompany.com"
+project_key = "CORE"
+username = "your_jira_user"
+api_token = "your_jira_api_token"
 
-llm:
-  base_url: "http://localhost:8000"
-  endpoint: "/generate-jira"
-  timeout: 10
-  prompt_path: "resources/generate_jira_task.md"
+[llm]
+base_url = "http://localhost:8000"
+endpoint = "/generate-jira"
+timeout = 10
+prompt_path = "resources/generate_jira_task.md"
 
-ui:
-  issue_types:
-    - Task
-    - Bug
-    - Story
-    - Spike
-  components:
-    - Core
-    - UI
-    - API Integration Layer
-    - Machine Learning Pipeline
-
+[ui]
+issue_types = ["Task", "Bug", "Story"]
+components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"]
 ```
 
 ## 🚀 Usage

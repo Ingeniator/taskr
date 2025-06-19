@@ -5,7 +5,7 @@ import httpx
 class TaskGeneratorService:
     def __init__(self, config=None):
         self.config = config or load_config()
-        self.mode = self.config.get("mode", "mock").lower()
+        self.mode = self.config["general"].get("mode", "mock").lower()
 
         llm_cfg = self.config.get("llm", {})
         self.base_url = llm_cfg.get("base_url", "http://localhost:8000")
