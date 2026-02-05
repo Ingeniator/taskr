@@ -10,7 +10,10 @@ RELEASE_DIR := release
 TARGET_ARCH ?= universal2
 ARCHFLAGS := "-arch arm64 -arch x86_64"
 
-.PHONY: venv dmg clean-dmg install build uninstall rebuild
+.PHONY: venv dmg clean-dmg install build uninstall rebuild test
+
+test:
+	@uv run pytest tests/ -v
 
 venv:
 	python3 -m venv venv && . venv/bin/activate

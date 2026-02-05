@@ -614,6 +614,7 @@ dev = [
     { name = "dmgbuild" },
     { name = "pipdeptree" },
     { name = "pyinstaller" },
+    { name = "pytest" },
     { name = "pytest-custom-report" },
 ]
 
@@ -632,6 +633,7 @@ dev = [
     { name = "dmgbuild", specifier = ">=1.6.5" },
     { name = "pipdeptree" },
     { name = "pyinstaller", specifier = ">=6.12.0" },
+    { name = "pytest", specifier = ">=8.0" },
     { name = "pytest-custom-report", specifier = ">=1.0.1" },
 ]
 
