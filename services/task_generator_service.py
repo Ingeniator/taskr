@@ -1,6 +1,6 @@
 # jira_generator_service.py
 import logging
-from services.config import load_config
+from services.config import load_config, get_resource_path
 import httpx
 
 logger = logging.getLogger(__name__)
@@ -70,7 +70,8 @@ class TaskGeneratorService:
         self.base_url = llm_cfg.get("base_url", "http://localhost:8008")
         self.endpoint = llm_cfg.get("endpoint", "/generate-jira")
         self.timeout = llm_cfg.get("timeout", 10)
-        self.prompt_path = llm_cfg.get("prompt_path", "resources/generate_jira_task.md")
+        raw_prompt_path = llm_cfg.get("prompt_path", "resources/generate_jira_task.md")
+        self.prompt_path = get_resource_path(raw_prompt_path)
 
     @staticmethod
     def _fallback(summary, error_msg):

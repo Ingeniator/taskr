@@ -21,7 +21,9 @@ def get_resource_path(rel_path):
     if hasattr(sys, '_MEIPASS'):
         logger.debug("Running from PyInstaller bundle: %s", sys._MEIPASS)
         return os.path.join(sys._MEIPASS, rel_path)
-    return os.path.join(os.path.abspath("."), rel_path)
+    # Resolve relative to the project root (where ctrllord.py lives)
+    package_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(package_dir, rel_path)
 
 
 def setup_logging():

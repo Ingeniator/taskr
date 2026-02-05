@@ -44,7 +44,7 @@ class TestTaskGeneratorInit:
         assert mock_service.base_url == "http://localhost:8001"
         assert mock_service.endpoint == "/generate-jira"
         assert mock_service.timeout == 10
-        assert mock_service.prompt_path == "resources/generate_jira_task.md"
+        assert mock_service.prompt_path.endswith("resources/generate_jira_task.md")
 
     def test_defaults_for_missing_keys(self):
         config = {

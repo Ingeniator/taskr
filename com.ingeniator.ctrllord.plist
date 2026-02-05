@@ -7,10 +7,10 @@
     <key>Label</key>
     <string>com.ingeniator.ctrllord</string>
 
-    <!-- The command to launch: must be exact path to .app binary -->
+    <!-- The command to launch: path to pip-installed script -->
     <key>ProgramArguments</key>
     <array>
-        <string>/Applications/CtrlLord.app/Contents/MacOS/CtrlLord</string>
+        <string>__CTRLLORD_BIN__</string>
     </array>
 
     <!-- Launch at user login -->

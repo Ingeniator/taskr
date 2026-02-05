@@ -10,7 +10,7 @@ RELEASE_DIR := release
 TARGET_ARCH ?= universal2
 ARCHFLAGS := "-arch arm64 -arch x86_64"
 
-.PHONY: venv dmg clean-dmg install build uninstall rebuild test
+.PHONY: venv dmg clean-dmg install build uninstall rebuild test install-pkg uninstall-pkg
 
 test:
 	@uv run pytest tests/ -v
@@ -94,6 +94,26 @@ build_old:
 	@echo "🛠️  Patching LSUIElement in Info.plist..."
 	@/usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "$(APP_BUNDLE)/Contents/Info.plist" || \
 	/usr/libexec/PlistBuddy -c "Set :LSUIElement true" "$(APP_BUNDLE)/Contents/Info.plist"
+
+install-pkg:
+	@echo "📦 Installing $(APP_NAME) as Python package..."
+	@uv pip install -e .
+	@CTRLLORD_BIN=$$(which ctrllord) && \
+	echo "Found ctrllord at: $$CTRLLORD_BIN" && \
+	sed "s|__CTRLLORD_BIN__|$$CTRLLORD_BIN|g" "$(PLIST_SOURCE)" > "$(PLIST_DEST)" && \
+	plutil -lint "$(PLIST_DEST)" || (echo "❌ Invalid .plist file" && false) && \
+	launchctl bootout gui/$$(id -u) "$(PLIST_DEST)" 2>/dev/null || true && \
+	launchctl bootstrap gui/$$(id -u) "$(PLIST_DEST)" || (echo "❌ Bootstrap failed!" && false)
+	@echo "✅ Installed as package and loaded LaunchAgent."
+	@echo "ℹ️  Grant Accessibility permission to your terminal (or Python) in:"
+	@echo "   System Settings > Privacy & Security > Accessibility"
+
+uninstall-pkg:
+	@echo "🗑️  Uninstalling $(APP_NAME) package..."
+	@launchctl bootout gui/$(shell id -u) "$(PLIST_DEST)" 2>/dev/null || true
+	@rm -f "$(PLIST_DEST)"
+	@uv pip uninstall taskr 2>/dev/null || true
+	@echo "✅ Uninstalled $(APP_NAME) package and LaunchAgent."
 
 uninstall:
 	@launchctl bootout gui/$(shell id -u) "$(PLIST_DEST)" || true
