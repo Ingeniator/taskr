@@ -71,18 +71,24 @@ class CtrlLord(QWidget):
         self.tray.setVisible(True)
 
     def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.KeyPress:
-            if event.key() == Qt.Key_Escape:
-                self.reset_ui()
-                return True
-            elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
-                if obj == self.input:
-                    self.handle_enter()
+        try:
+            if event.type() == QEvent.Type.KeyPress:
+                if event.key() == Qt.Key_Escape:
+                    self.reset_ui()
                     return True
-                elif obj == self.textarea and event.modifiers() & Qt.ShiftModifier:
-                    self.handle_enter()
-                    return True
-                # Otherwise: allow Enter to insert newline in textarea
+                elif event.key() in (Qt.Key_Return, Qt.Key_Enter):
+                    if obj == self.input:
+                        self.handle_enter()
+                        return True
+                    elif obj == self.textarea and event.modifiers() & Qt.ShiftModifier:
+                        self.handle_enter()
+                        return True
+                    # Otherwise: allow Enter to insert newline in textarea
+        except Exception as e:
+            print(f"Error in eventFilter: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
         return super().eventFilter(obj, event)
 
     def adjust_height_to_content(self):
@@ -111,7 +117,12 @@ class CtrlLord(QWidget):
 
     def refresh_from_config(self):
         config = load_config()
-        self.jira.reload_config()
+        try:
+            self.jira.reload_config()
+            self.generator.reload_config()
+        except Exception as e:
+            print(f"Error during reconfiguration {str(e)}")
+            self.show_toast(str(e))
         issue_types = config["ui"]["issue_types"]
         components = config["ui"]["components"]
         print("🔄 UI reloading categories…")
@@ -321,17 +332,22 @@ class CtrlLord(QWidget):
         issue_type = self.type_dropdown.currentText()
         component = self.component_dropdown.currentText()
 
-        self.task_data = self.jira.submit_task(summary, description, issue_type, component)
-
-        jira_url = self.task_data["url"]
-        task_key = self.task_data["key"]
-
-        toast_text = f'✅ Task <a href="{jira_url}">{task_key}</a> created (copied)'
-        # 📋 Copy key to clipboard
         try:
-            QApplication.clipboard().setText(task_key)
+            self.task_data = self.jira.submit_task(summary, description, issue_type, component)
+
+            jira_url = self.task_data.get("url")        
+            task_key = self.task_data.get("key")
+
+            toast_text = f'✅ Task <a href="{jira_url}">{task_key}</a> created (copied)'
+
+            # 📋 Copy key to clipboard
+            try:
+                QApplication.clipboard().setText(task_key)
+            except Exception as e:
+                toast_text = ("Task created, but clipboard copy failed.")
+
         except Exception as e:
-            toast_text = ("Task created, but clipboard copy failed.")
+            toast_text = str(e)
 
         self.show_toast(toast_text)
 

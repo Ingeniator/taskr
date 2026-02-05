@@ -31,16 +31,15 @@ Make sure you have Python 3.8+ and PyQt5 installed.
 Create a config file at config/config.toml:
 
 ```toml
-[general]
-mode = "mock"  # "mock", "mock_llm", "mock_jira", or "live"
-
 [jira]
+mode = "mock"
 base_url = "https://jira.yourcompany.com"
 project_key = "CORE"
 username = "your_jira_user"
 api_token = "your_jira_api_token"
 
 [llm]
+mode = "mock"
 base_url = "http://localhost:8000"
 endpoint = "/generate-jira"
 timeout = 10
