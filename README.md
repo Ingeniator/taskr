@@ -15,17 +15,43 @@ A lightweight, macOS-style launcher built with **PySide6** that allows you to qu
 - Toast notifications and clipboard copy
 - Mock mode for testing without Jira or LLM
 - System tray icon with settings editor
+- Runs as a background Python process — no `.app` bundle or root required
 
 ---
+
+## Requirements
+
+- Python 3.13+
+- macOS (uses Accessibility API for global hotkey)
+- [uv](https://github.com/astral-sh/uv) package manager
 
 ## Installation
 
 ```bash
-brew install jpeg webp zlib libtiff freetype little-cms2
 uv sync
+make install
 ```
 
-Requires Python 3.13+ and PySide6.
+This will:
+1. Install the package and dependencies into the venv
+2. Register a LaunchAgent to auto-start at login
+3. Open Accessibility settings — toggle the permission for your terminal
+
+To run manually without the LaunchAgent:
+
+```bash
+uv run ctrllord
+```
+
+## Uninstall
+
+```bash
+make uninstall
+```
+
+Removes the package and LaunchAgent.
+
+---
 
 ## Configuration
 
@@ -52,11 +78,9 @@ components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"
 hotkey = "<cmd>+l"
 ```
 
-## Usage
+You can also edit the config from the tray icon menu (Settings).
 
-```bash
-python ctrllord.py
-```
+## Usage
 
 - Press `Cmd + L` to open the launcher (configurable via `hotkey` in config).
 - Type a quick summary (or prefilled from your clipboard).
@@ -84,14 +108,6 @@ The LLM must return a structured JSON like:
   "description": "# Fix retry logic...\n\n## Context...",
   "type": "Bug"
 }
-```
-
-## Packaging (Optional)
-
-You can use PyInstaller to bundle as a .app for macOS:
-
-```bash
-make build
 ```
 
 ## License
