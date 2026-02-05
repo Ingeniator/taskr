@@ -13,3 +13,4 @@ prompt_path = "resources/generate_jira_task.md"
 [ui]
 issue_types = ["Task", "Bug", "Story"]
 components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"]
+hotkey = "<cmd>+l"

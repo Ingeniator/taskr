@@ -1,34 +1,33 @@
 # ui/launcher.py
+import logging
+import traceback
 
 from PySide6.QtWidgets import (
     QApplication,
     QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QLineEdit, QTextEdit, QComboBox, QToolButton,
-    QStyle, QStyledItemDelegate, QStyleOptionViewItem, 
+    QStyle, QStyledItemDelegate, QStyleOptionViewItem,
     QGraphicsDropShadowEffect, QSystemTrayIcon, QMenu
 )
 from PySide6.QtCore import Qt, QTimer, Slot, QEvent
 from PySide6.QtGui import (
     QFont, QClipboard, QColor, QIcon, QAction, QCursor,
-    QTextCharFormat, QTextCursor, QGuiApplication   
+    QTextCharFormat, QTextCursor, QGuiApplication
 )
 
 from services.parser import parse_task_text
 from services.jira_service import JiraService
 from services.task_generator_service import TaskGeneratorService
-from services.config import load_config
+from services.config import load_config, get_resource_path
 
 from ui.toast import ToastMessage
 from ui.styles import NoCheckmarkBoldSelectedDelegate
 from ui.config import ConfigEditorDialog
 
-import os
-import sys
+logger = logging.getLogger(__name__)
 
-def resource_path(rel_path):
-    if hasattr(sys, "_MEIPASS"):
-        return os.path.join(sys._MEIPASS, rel_path)
-    return os.path.join(os.path.abspath("."), rel_path)
+MAX_CLIPBOARD_LENGTH = 500
+
 
 class CtrlLord(QWidget):
     def __init__(self):
@@ -44,27 +43,27 @@ class CtrlLord(QWidget):
         self.jira = JiraService()
         self.init_ui()
         self.create_tray()
-    
+
     def create_tray(self):
         # Load tray icon
-        tray_icon_path = resource_path("resources/icon.png")
+        tray_icon_path = get_resource_path("resources/icon.png")
         icon = QIcon(tray_icon_path)
         if icon.isNull():
-            print("❌ Failed to load tray icon!")
+            logger.error("Failed to load tray icon from %s", tray_icon_path)
         self.tray = QSystemTrayIcon(self)
         self.tray.setIcon(icon)
         self.tray.setToolTip("CtrlLord")
 
         menu = QMenu(self)
-        open_action = QAction("📝 Create Task", self)
+        open_action = QAction("Create Task", self)
         open_action.triggered.connect(self.show_launcher)
         menu.addAction(open_action)
         menu.addSeparator()
-        settings_action = QAction("⚙️ Settings", self)
+        settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.show_config)
         menu.addAction(settings_action)
         menu.addSeparator()
-        quit_action = QAction("❌ Quit", self)
+        quit_action = QAction("Quit", self)
         quit_action.triggered.connect(QApplication.quit)
         menu.addAction(quit_action)
         self.tray.setContextMenu(menu)
@@ -85,9 +84,8 @@ class CtrlLord(QWidget):
                         return True
                     # Otherwise: allow Enter to insert newline in textarea
         except Exception as e:
-            print(f"Error in eventFilter: {e}")
-            import traceback
-            traceback.print_exc()
+            logger.error("Error in eventFilter: %s", e)
+            logger.debug(traceback.format_exc())
             return False
         return super().eventFilter(obj, event)
 
@@ -116,16 +114,16 @@ class CtrlLord(QWidget):
         self.hide()
 
     def refresh_from_config(self):
-        config = load_config()
         try:
-            self.jira.reload_config()
-            self.generator.reload_config()
+            config = load_config()
+            self.jira.reload_config(config)
+            self.generator.reload_config(config)
         except Exception as e:
-            print(f"Error during reconfiguration {str(e)}")
+            logger.error("Error during reconfiguration: %s", e)
             self.show_toast(str(e))
-        issue_types = config["ui"]["issue_types"]
-        components = config["ui"]["components"]
-        print("🔄 UI reloading categories…")
+            return
+
+        logger.info("UI reloading categories")
         self.type_dropdown.clear()
         self.type_dropdown.addItems(config["ui"]["issue_types"])
         self.component_dropdown.clear()
@@ -237,28 +235,10 @@ class CtrlLord(QWidget):
         self.component_dropdown = QComboBox()
         self.component_dropdown.setItemDelegate(NoCheckmarkBoldSelectedDelegate(self.component_dropdown))
         self.component_dropdown.setStyleSheet(self.type_dropdown.styleSheet())
-        
+
         self.component_layout.addWidget(label)
         self.component_layout.addWidget(self.component_dropdown)
         self.component_layout.addStretch()
-        # # ➕ Add config button (bottom-right)
-        # self.config_button = QToolButton()
-        # self.config_button.setText("⚙️")
-        # self.config_button.setToolTip("Edit Configuration")
-        # self.config_button.setCursor(Qt.PointingHandCursor)
-        # self.config_button.setStyleSheet("""
-        #     QToolButton {
-        #         background: transparent;
-        #         border: none;
-        #         padding: 0px;
-        #         font-size: 14px;
-        #     }
-        #     QToolButton:hover {
-        #         color: #555;
-        #     }
-        # """)
-        # self.config_button.clicked.connect(self.show_config)
-        # self.component_layout.addWidget(self.config_button)
 
         self.details_layout.addWidget(self.component_line)
         self.details_section.setLayout(self.details_layout)
@@ -284,11 +264,14 @@ class CtrlLord(QWidget):
 
         task_generated_data = self.generator.build_task_payload(summary)
 
+        # Use first component from dropdown as default instead of hardcoded value
+        default_component = self.component_dropdown.itemText(0) if self.component_dropdown.count() > 0 else ""
+
         self.task_data = {
             "type": task_generated_data.get("type", "Task"),
             "summary": task_generated_data.get("summary", summary),
             "description": task_generated_data.get("description", ""),
-            "component": "Core"
+            "component": default_component
         }
 
         self.input.hide()
@@ -319,7 +302,7 @@ class CtrlLord(QWidget):
         index = self.component_dropdown.findText(self.task_data["component"])
         if index >= 0:
             self.component_dropdown.setCurrentIndex(index)
-        
+
         self.step = 1
 
     def submit_task(self):
@@ -335,19 +318,21 @@ class CtrlLord(QWidget):
         try:
             self.task_data = self.jira.submit_task(summary, description, issue_type, component)
 
-            jira_url = self.task_data.get("url")        
+            jira_url = self.task_data.get("url")
             task_key = self.task_data.get("key")
 
-            toast_text = f'✅ Task <a href="{jira_url}">{task_key}</a> created (copied)'
+            toast_text = f'Task <a href="{jira_url}">{task_key}</a> created (copied)'
 
-            # 📋 Copy key to clipboard
+            # Copy key to clipboard
             try:
                 QApplication.clipboard().setText(task_key)
             except Exception as e:
+                logger.warning("Clipboard copy failed: %s", e)
                 toast_text = ("Task created, but clipboard copy failed.")
 
         except Exception as e:
-            toast_text = str(e)
+            logger.error("Task submission failed: %s", e, exc_info=True)
+            toast_text = f"Failed to create task: {e}"
 
         self.show_toast(toast_text)
 
@@ -380,15 +365,14 @@ class CtrlLord(QWidget):
     def show_launcher(self):
         self.fix_screen_position()
 
-        # 🔥 Pre-fill from clipboard
+        # Pre-fill from clipboard (with length limit)
         if not self.input.text().strip():
             clipboard = QApplication.clipboard()
             text = clipboard.text().strip()
-            if text:
+            if text and len(text) <= MAX_CLIPBOARD_LENGTH:
                 self.input.setText(text)
 
         self.show()
         self.activateWindow()
         self.raise_()
         self.input.setFocus()
-

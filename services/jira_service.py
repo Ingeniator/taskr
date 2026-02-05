@@ -1,9 +1,13 @@
 # jira_service.py
 import random
 import time
+import logging
 from atlassian import Jira
 
 from services.config import load_config
+
+logger = logging.getLogger(__name__)
+
 
 class JiraService:
     def __init__(self):
@@ -27,11 +31,11 @@ class JiraService:
 
         if not self.client:
             self.client = Jira(
-                url = self.base_url,
-                username = self.username,
-                token = self.token
+                url=self.base_url,
+                username=self.username,
+                token=self.token
             )
-        print(f"creating issue {self.project_key}")
+        logger.info("Creating issue in project %s", self.project_key)
         try:
             issue = self.client.create_issue(fields={
                 "project": {"key": self.project_key},
@@ -41,12 +45,10 @@ class JiraService:
                 "components": [{"name": component}] if component else []
             })
         except Exception as e:
-            print("❌ Exception occurred:")
-            print(f"Type: {type(e)}")
-            print(f"Args: {e.args}")
+            logger.error("Failed to create Jira issue: %s (type=%s, args=%s)", e, type(e).__name__, e.args)
             raise
         issue_key = issue.get("key", "UNKNOWN")
-        print(issue_key)
+        logger.info("Created issue %s", issue_key)
         return {
             "key": issue_key,
             "summary": summary,
@@ -56,9 +58,9 @@ class JiraService:
             "url": f"{self.base_url.rstrip('/')}/browse/{issue_key}"
         }
 
-    def reload_config(self):
-        print("🔄 JiraService config is reloading.")
-        self.config = load_config()
+    def reload_config(self, config=None):
+        logger.info("JiraService config is reloading.")
+        self.config = config or load_config()
         cfg = self.config.get("jira", {})
         self.base_url = cfg.get("base_url", "")
         self.project_key = cfg.get("project_key", "")
