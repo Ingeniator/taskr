@@ -5,6 +5,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from services.jira_service import JiraService
+from services.task_service import TaskService
 
 
 MOCK_CONFIG = {
@@ -17,6 +18,7 @@ MOCK_CONFIG = {
     },
     "llm": {"base_url": "http://localhost", "endpoint": "/gen"},
     "ui": {"issue_types": ["Task"], "components": ["Core"]},
+    "task": {"backend": "jira", "data_dir": ""},
 }
 
 LIVE_CONFIG = {
@@ -198,3 +200,8 @@ class TestReloadConfig:
         with patch("services.jira_service.load_config", return_value=LIVE_CONFIG) as mock_load:
             mock_service.reload_config()
             mock_load.assert_called_once()
+
+
+class TestJiraServiceIsTaskService:
+    def test_is_subclass_of_task_service(self):
+        assert issubclass(JiraService, TaskService)

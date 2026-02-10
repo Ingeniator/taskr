@@ -3,6 +3,7 @@ base_url = "https://jira.yourcompany.com"
 project_key = "CORE"
 username = "your_jira_user"
 token = "your_jira_personal_access_token"
+mode = "mock"  # "mock" for local testing, "live" for real Jira
 
 [llm]
 base_url = "http://localhost:8001"
@@ -10,7 +11,11 @@ endpoint = "/generate-jira"
 timeout = 10
 prompt_path = "resources/generate_jira_task.md"
 
+[task]
+backend = "json"  # "jira" or "json"
+data_dir = "~/.config/CtrlLord/data"
+
 [ui]
 issue_types = ["Task", "Bug", "Story"]
 components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"]
-hotkey = "<cmd>+l"
+hotkey = "double_cmd"

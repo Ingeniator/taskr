@@ -26,6 +26,10 @@ VALID_CONFIG = {
         "issue_types": ["Task", "Bug", "Story"],
         "components": ["Core", "UI"],
     },
+    "task": {
+        "backend": "json",
+        "data_dir": "~/.config/CtrlLord/data",
+    },
 }
 
 

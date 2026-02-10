@@ -6,6 +6,7 @@ import fcntl
 import atexit
 import signal
 import logging
+import time
 import threading
 from pynput import keyboard
 
@@ -94,13 +95,13 @@ def main():
 
     signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
-    # Read hotkey from config (default: <cmd>+l)
+    # Read hotkey from config (default: double_cmd)
     try:
         config = load_config()
-        hotkey = config.get("ui", {}).get("hotkey", "<cmd>+l")
+        hotkey = config.get("ui", {}).get("hotkey", "double_cmd")
     except Exception as e:
         logger.warning("Failed to load config for hotkey, using default: %s", e)
-        hotkey = "<cmd>+l"
+        hotkey = "double_cmd"
 
     # macOS activation
     if platform.system() == "Darwin":
@@ -118,11 +119,37 @@ def main():
         QMetaObject.invokeMethod(launcher, "show_launcher", Qt.QueuedConnection)
 
     # Start hotkey listener in thread
-    def listener():
-        with keyboard.GlobalHotKeys({
-            hotkey: trigger_launcher
-        }) as h:
-            h.join()
+    if hotkey == "double_cmd":
+        DOUBLE_TAP_INTERVAL = 0.3  # seconds
+
+        def listener():
+            last_cmd_release = 0.0
+            other_key_pressed = False
+
+            def on_press(key):
+                nonlocal other_key_pressed
+                if key not in (keyboard.Key.cmd, keyboard.Key.cmd_r):
+                    other_key_pressed = True
+
+            def on_release(key):
+                nonlocal last_cmd_release, other_key_pressed
+                if key in (keyboard.Key.cmd, keyboard.Key.cmd_r):
+                    now = time.monotonic()
+                    if not other_key_pressed and (now - last_cmd_release) < DOUBLE_TAP_INTERVAL:
+                        last_cmd_release = 0.0
+                        trigger_launcher()
+                    else:
+                        last_cmd_release = now
+                    other_key_pressed = False
+
+            with keyboard.Listener(on_press=on_press, on_release=on_release) as h:
+                h.join()
+    else:
+        def listener():
+            with keyboard.GlobalHotKeys({
+                hotkey: trigger_launcher
+            }) as h:
+                h.join()
 
     threading.Thread(target=listener, daemon=True).start()
 

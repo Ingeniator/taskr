@@ -17,7 +17,9 @@ from PySide6.QtGui import (
 
 from services.parser import parse_task_text
 from services.jira_service import JiraService
+from services.json_service import JsonService
 from services.task_generator_service import TaskGeneratorService
+from services.task_queue import TaskQueueWorker, TaskPayload
 from services.config import load_config, get_resource_path
 
 from ui.toast import ToastMessage
@@ -28,6 +30,20 @@ logger = logging.getLogger(__name__)
 
 MAX_CLIPBOARD_LENGTH = 500
 
+BACKENDS = {
+    "jira": JiraService,
+    "json": JsonService,
+}
+
+
+def _create_task_service():
+    config = load_config()
+    backend = config.get("task", {}).get("backend", "json")
+    cls = BACKENDS.get(backend)
+    if cls is None:
+        raise ValueError(f"Unknown task backend: {backend!r}. Choose from: {', '.join(BACKENDS)}")
+    return cls()
+
 
 class CtrlLord(QWidget):
     def __init__(self):
@@ -37,10 +53,18 @@ class CtrlLord(QWidget):
         self.setFixedSize(700, 180)
 
         self.step = 0
-        self.toast = None
+        self._active_toasts = []
 
         self.generator = TaskGeneratorService()
-        self.jira = JiraService()
+        self.task_service = _create_task_service()
+
+        self._worker = TaskQueueWorker(self.task_service)
+        self._worker.task_completed.connect(self._on_task_completed)
+        self._worker.task_failed.connect(self._on_task_failed)
+        self._worker.start()
+
+        QApplication.instance().aboutToQuit.connect(self._shutdown_worker)
+
         self.init_ui()
         self.create_tray()
 
@@ -116,7 +140,7 @@ class CtrlLord(QWidget):
     def refresh_from_config(self):
         try:
             config = load_config()
-            self.jira.reload_config(config)
+            self.task_service.reload_config(config)
             self.generator.reload_config(config)
         except Exception as e:
             logger.error("Error during reconfiguration: %s", e)
@@ -315,38 +339,53 @@ class CtrlLord(QWidget):
         issue_type = self.type_dropdown.currentText()
         component = self.component_dropdown.currentText()
 
-        try:
-            self.task_data = self.jira.submit_task(summary, description, issue_type, component)
-
-            jira_url = self.task_data.get("url")
-            task_key = self.task_data.get("key")
-
-            toast_text = f'Task <a href="{jira_url}">{task_key}</a> created (copied)'
-
-            # Copy key to clipboard
-            try:
-                QApplication.clipboard().setText(task_key)
-            except Exception as e:
-                logger.warning("Clipboard copy failed: %s", e)
-                toast_text = ("Task created, but clipboard copy failed.")
-
-        except Exception as e:
-            logger.error("Task submission failed: %s", e, exc_info=True)
-            toast_text = f"Failed to create task: {e}"
-
-        self.show_toast(toast_text)
-
+        payload = TaskPayload(
+            summary=summary,
+            description=description,
+            issue_type=issue_type,
+            component=component,
+        )
+        self._worker.enqueue(payload)
         self.reset_ui()
 
-    def show_toast(self, message: str):
+    @Slot(dict)
+    def _on_task_completed(self, result):
+        jira_url = result.get("url")
+        task_key = result.get("key")
+        toast_text = f'Task <a href="{jira_url}">{task_key}</a> created (copied)'
 
+        try:
+            QApplication.clipboard().setText(task_key)
+        except Exception as e:
+            logger.warning("Clipboard copy failed: %s", e)
+            toast_text = "Task created, but clipboard copy failed."
+
+        self._show_background_toast(toast_text)
+
+    @Slot(str, object)
+    def _on_task_failed(self, error, payload):
+        self._show_background_toast(f"Failed to create task: {error}")
+
+    def show_toast(self, message: str):
         toast = ToastMessage(message)
         x = self.x() + (self.width() - toast.width()) // 2
         y = self.y() + self.height() + 10
-
         toast.show_at(x, y)
+        self._active_toasts.append(toast)
+        toast.destroyed.connect(lambda: self._active_toasts.remove(toast) if toast in self._active_toasts else None)
 
-        self.toast = toast  # Keep reference alive!
+    def _show_background_toast(self, message: str):
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        toast = ToastMessage(message)
+        x = (screen.width() - toast.width()) // 2
+        y = int(screen.height() * 0.2)
+        toast.show_at(x, y)
+        self._active_toasts.append(toast)
+        toast.destroyed.connect(lambda: self._active_toasts.remove(toast) if toast in self._active_toasts else None)
+
+    def _shutdown_worker(self):
+        self._worker.stop()
+        self._worker.wait(5000)
 
     def fix_screen_position(self):
         screen = QGuiApplication.primaryScreen().availableGeometry()

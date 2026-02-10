@@ -1,6 +1,6 @@
 # CtrlLord — Jira Quick Task Launcher
 
-A lightweight, macOS-style launcher built with **PySide6** that allows you to quickly create Jira tasks using a global hotkey (`Cmd + L`). The app supports both **mock mode** for local development and **live integration** with Jira and LLM services.
+A lightweight, macOS-style launcher built with **PySide6** that allows you to quickly create Jira tasks using a global hotkey (double-press `Cmd`). The app supports both **mock mode** for local development and **live integration** with Jira and LLM services.
 
 ---
 
@@ -72,17 +72,28 @@ endpoint = "/generate-jira"
 timeout = 10
 prompt_path = "resources/generate_jira_task.md"
 
+[task]
+backend = "json"   # "jira" or "json"
+data_dir = "~/.config/CtrlLord/data"
+
 [ui]
 issue_types = ["Task", "Bug", "Story"]
 components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"]
-hotkey = "<cmd>+l"
+hotkey = "double_cmd"
 ```
+
+### `[task]` section
+
+| Key | Description |
+|-----|-------------|
+| `backend` | Which task backend to use: `"jira"` (submit to Jira) or `"json"` (save as local JSON files) |
+| `data_dir` | Local directory for task JSON files. Used by the `json` backend for primary storage, and by the `jira` backend to keep a local copy of submitted tasks. |
 
 You can also edit the config from the tray icon menu (Settings).
 
 ## Usage
 
-- Press `Cmd + L` to open the launcher (configurable via `hotkey` in config).
+- Double-press `Cmd` to open the launcher (configurable via `hotkey` in config).
 - Type a quick summary (or prefilled from your clipboard).
 - Hit Enter to generate full task details.
 - Press Shift + Enter to submit to Jira.

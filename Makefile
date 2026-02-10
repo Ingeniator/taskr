@@ -2,7 +2,7 @@ APP_NAME=CtrlLord
 PLIST_SOURCE=./com.ingeniator.ctrllord.plist
 PLIST_DEST=$(HOME)/Library/LaunchAgents/com.ingeniator.ctrllord.plist
 
-.PHONY: test install uninstall clean nuke
+.PHONY: test install reinstall uninstall clean nuke
 
 test:
 	@uv run pytest tests/ -v
@@ -19,6 +19,8 @@ install:
 	@echo "✅ Installed as package and loaded LaunchAgent."
 	@echo "ℹ️  Grant Accessibility permission to your terminal in the window that opens."
 	@open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+
+reinstall: uninstall install
 
 uninstall:
 	@echo "🗑️  Uninstalling $(APP_NAME)..."

@@ -14,6 +14,7 @@ REQUIRED_SECTIONS = {
     "jira": ["base_url", "project_key"],
     "llm": ["base_url", "endpoint"],
     "ui": ["issue_types", "components"],
+    "task": ["backend", "data_dir"],
 }
 
 
