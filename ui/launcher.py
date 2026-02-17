@@ -20,11 +20,13 @@ from services.jira_service import JiraService
 from services.json_service import JsonService
 from services.task_generator_service import TaskGeneratorService
 from services.task_queue import TaskQueueWorker, TaskPayload
+from services.task_loader import load_todays_tasks
 from services.config import load_config, get_resource_path
 
 from ui.toast import ToastMessage
 from ui.styles import NoCheckmarkBoldSelectedDelegate
 from ui.config import ConfigEditorDialog
+from ui.dashboard import TaskDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +84,9 @@ class CtrlLord(QWidget):
         open_action = QAction("Create Task", self)
         open_action.triggered.connect(self.show_launcher)
         menu.addAction(open_action)
+        dashboard_action = QAction("Today's Tasks", self)
+        dashboard_action.triggered.connect(self.toggle_dashboard)
+        menu.addAction(dashboard_action)
         menu.addSeparator()
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.show_config)
@@ -135,6 +140,8 @@ class CtrlLord(QWidget):
         self.setFixedHeight(180)
         self.input.setFocus()
         self.step = 0
+        if hasattr(self, "_dashboard"):
+            self._dashboard.hide()
         self.hide()
 
     def refresh_from_config(self):
@@ -170,15 +177,22 @@ class CtrlLord(QWidget):
         self.input.setGraphicsEffect(shadow)
         self.input.setPlaceholderText("Create a JIRA task...")
         self.input.setFont(QFont("Helvetica Neue", 22, QFont.Medium))
+        self.input.returnPressed.connect(self.handle_enter)
+        self.input.installEventFilter(self)
+
+        # Dashboard icon inside input field
+        dashboard_icon = QIcon(get_resource_path("resources/dashboard.svg"))
+        self._dashboard_action = self.input.addAction(
+            dashboard_icon, QLineEdit.TrailingPosition
+        )
+        self._dashboard_action.triggered.connect(self.toggle_dashboard)
         self.input.setStyleSheet("""
             QLineEdit {
-                padding: 14px 24px;
+                padding: 14px 38px 14px 24px;
                 border-radius: 14px;
                 border: 1px solid #ccc;
             }
         """)
-        self.input.returnPressed.connect(self.handle_enter)
-        self.input.installEventFilter(self)
 
         # STEP 2: Details section
         self.details_section = QWidget()
@@ -392,6 +406,25 @@ class CtrlLord(QWidget):
         x = (screen.width() - self.width()) // 2
         y = int(screen.height() * 0.2)  # top 20% of screen
         self.move(x, y)
+
+    @Slot()
+    def toggle_dashboard(self):
+        if not hasattr(self, "_dashboard"):
+            self._dashboard = TaskDashboard()
+
+        if self._dashboard.isVisible():
+            self._dashboard.hide()
+            return
+
+        config = load_config()
+        data_dir = config.get("task", {}).get("data_dir", "~/.config/CtrlLord/data")
+        tasks = load_todays_tasks(data_dir)
+        self._dashboard.load_tasks(tasks)
+
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        x = (screen.width() - self._dashboard.width()) // 2
+        y = int(screen.height() * 0.2) + self.height() + 10
+        self._dashboard.show_at(x, y)
 
     @Slot()
     def show_config(self):
