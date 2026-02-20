@@ -21,12 +21,14 @@ from services.json_service import JsonService
 from services.task_generator_service import TaskGeneratorService
 from services.task_queue import TaskQueueWorker, TaskPayload
 from services.task_loader import load_todays_tasks
+from services.playbook_loader import load_playbooks
 from services.config import load_config, get_resource_path
 
 from ui.toast import ToastMessage
 from ui.styles import NoCheckmarkBoldSelectedDelegate
 from ui.config import ConfigEditorDialog
 from ui.dashboard import TaskDashboard
+from ui.playbook_dashboard import PlaybookDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -87,6 +89,9 @@ class CtrlLord(QWidget):
         dashboard_action = QAction("Today's Tasks", self)
         dashboard_action.triggered.connect(self.toggle_dashboard)
         menu.addAction(dashboard_action)
+        playbook_action = QAction("Playbooks", self)
+        playbook_action.triggered.connect(self.toggle_playbook_dashboard)
+        menu.addAction(playbook_action)
         menu.addSeparator()
         settings_action = QAction("Settings", self)
         settings_action.triggered.connect(self.show_config)
@@ -142,6 +147,8 @@ class CtrlLord(QWidget):
         self.step = 0
         if hasattr(self, "_dashboard"):
             self._dashboard.hide()
+        if hasattr(self, "_playbook_dashboard"):
+            self._playbook_dashboard.hide()
         self.hide()
 
     def refresh_from_config(self):
@@ -186,6 +193,12 @@ class CtrlLord(QWidget):
             dashboard_icon, QLineEdit.TrailingPosition
         )
         self._dashboard_action.triggered.connect(self.toggle_dashboard)
+
+        playbook_icon = QIcon(get_resource_path("resources/playbook.svg"))
+        self._playbook_action = self.input.addAction(
+            playbook_icon, QLineEdit.TrailingPosition
+        )
+        self._playbook_action.triggered.connect(self.toggle_playbook_dashboard)
         self.input.setStyleSheet("""
             QLineEdit {
                 padding: 14px 38px 14px 24px;
@@ -425,6 +438,30 @@ class CtrlLord(QWidget):
         x = (screen.width() - self._dashboard.width()) // 2
         y = int(screen.height() * 0.2) + self.height() + 10
         self._dashboard.show_at(x, y)
+
+    @Slot()
+    def toggle_playbook_dashboard(self):
+        if not hasattr(self, "_playbook_dashboard"):
+            self._playbook_dashboard = PlaybookDashboard()
+
+        if self._playbook_dashboard.isVisible():
+            self._playbook_dashboard.hide()
+            return
+
+        config = load_config()
+        pb_cfg = config.get("playbook")
+        if not pb_cfg:
+            self.show_toast("Add [playbook] section to config")
+            return
+
+        playbook_dir = pb_cfg.get("playbook_dir", "~/.config/CtrlLord/playbooks")
+        playbooks = load_playbooks(playbook_dir)
+        self._playbook_dashboard.load_playbooks(playbooks)
+
+        screen = QGuiApplication.primaryScreen().availableGeometry()
+        x = (screen.width() - self._playbook_dashboard.width()) // 2
+        y = int(screen.height() * 0.2) + self.height() + 10
+        self._playbook_dashboard.show_at(x, y)
 
     @Slot()
     def show_config(self):

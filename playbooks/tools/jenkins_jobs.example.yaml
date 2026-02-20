@@ -1,0 +1,23 @@
+# How to run the jobs
+execution:
+  # "sequential" - one by one, wait for each to finish
+  # "parallel"   - trigger all at once, then wait for all
+  mode: "sequential"
+  # Stop remaining jobs on first failure (sequential mode only)
+  fail_fast: true
+  # Max time to wait for a single job to complete (seconds, 0 = no limit)
+  timeout: 1800
+
+jobs:
+- name: "my-project/build"
+  # Optional parameters to pass to the job
+  parameters:
+    BRANCH: "main"
+    ENV: "staging"
+
+- name: "my-project/test"
+  parameters:
+    SUITE: "integration"
+
+- name: "my-project/deploy"
+  # Jobs without parameters

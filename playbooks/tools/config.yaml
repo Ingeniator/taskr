@@ -1,0 +1,13 @@
+jenkins:
+  url: "https://jenkins.example.com"
+  user: "your-username"
+  # API token from Jenkins > User > Configure > API Token
+  # Can also be set via JENKINS_API_TOKEN env var
+  token: ""
+
+jira:
+  url: "https://jira.example.com"
+  user: "your-username"
+  # API token from Jira > Account Settings > Security > API token
+  # Can also be set via JIRA_API_TOKEN env var
+  token: ""

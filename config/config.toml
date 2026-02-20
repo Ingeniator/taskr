@@ -19,3 +19,7 @@ data_dir = "~/.config/CtrlLord/data"
 issue_types = ["Task", "Bug", "Story"]
 components = ["Core", "UI", "API Integration Layer", "Machine Learning Pipeline"]
 hotkey = "double_cmd"
+
+[playbook]
+playbook_dir_default = "./playbooks" 
+playbook_dir = "~/.config/CtrlLord/playbooks"

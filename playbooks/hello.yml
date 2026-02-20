@@ -1,0 +1,12 @@
+name: Hello World
+params:
+  - name: USER_NAME
+    label: "Your name"
+    default: "World"
+steps:
+  - name: Say hello
+    run: echo "Hello, $USER_NAME!"
+  - name: Sleep 10s
+    run: sleep 10
+  - name: Show date
+    run: date

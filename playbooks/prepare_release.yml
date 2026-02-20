@@ -1,0 +1,42 @@
+name: Prepare Release
+description: Build distributive, manage Jira release ticket, link issues, transition
+cwd: ./tools
+params:
+  - name: VERSION
+    label: "Release version"
+    default: "1.0.0"
+
+steps:
+  - name: Install dependencies
+    run: pip3 install -r requirements.txt -q
+
+  - name: Build distributive via Jenkins
+    run: |
+      python3 run_jenkins_jobs.py -c - << EOF
+      execution:
+        mode: sequential
+        fail_fast: true
+        timeout: 1800
+
+      jobs:
+      - name: "my-project/build"
+        parameters:
+          BRANCH: "release/$VERSION"
+          VERSION: "$VERSION"
+      EOF
+
+  - name: Find or create release ticket
+    run: |
+      python3 jira_release.py find-or-create \
+        --project PROJ \
+        --version "$VERSION"
+
+  - name: Link issues to release ticket
+    run: |
+      python3 jira_release.py link-issues \
+        --jql "project = PROJ AND fixVersion = $VERSION"
+
+  - name: Transition release ticket
+    run: |
+      python3 jira_release.py transition \
+        --status "Done"
