@@ -1,12 +1,17 @@
+import json
+import os
+
 from PySide6.QtWidgets import (
     QWidget, QHBoxLayout, QVBoxLayout, QLabel,
     QListWidget, QTextEdit, QStackedWidget, QPushButton,
-    QGraphicsDropShadowEffect, QScrollArea, QLineEdit,
+    QGraphicsDropShadowEffect, QScrollArea, QLineEdit, QSplitter,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 
 from services.playbook_runner import PlaybookRunner
+
+_PARAMS_CACHE = os.path.expanduser("~/.config/CtrlLord/data/playbook_params.json")
 
 
 class PlaybookDashboard(QWidget):
@@ -19,9 +24,12 @@ class PlaybookDashboard(QWidget):
         self.setFixedSize(850, 550)
 
         self._playbooks = []
-        self._runner = None
+        self._runners: dict[str, PlaybookRunner] = {}
         self._step_labels = []
         self._param_fields: list[tuple[str, QLineEdit]] = []
+        self._playbook_logs: dict[str, list[str]] = {}
+        self._playbook_step_states: dict[str, list[tuple[str, str]]] = {}
+        self._current_file_path: str = ""
         self._init_ui()
 
     def _init_ui(self):
@@ -118,6 +126,17 @@ class PlaybookDashboard(QWidget):
         self._params_layout.setSpacing(4)
         detail_layout.addLayout(self._params_layout)
 
+        # Splitter: steps on top, log on bottom
+        splitter = QSplitter(Qt.Vertical)
+        splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #555;
+                height: 3px;
+                border-radius: 1px;
+                margin: 2px 40px;
+            }
+        """)
+
         # Step list in scroll area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -128,7 +147,7 @@ class PlaybookDashboard(QWidget):
         self._steps_layout.setSpacing(2)
         self._steps_layout.addStretch()
         scroll.setWidget(self._steps_widget)
-        detail_layout.addWidget(scroll)
+        splitter.addWidget(scroll)
 
         # Log viewer
         self._log = QTextEdit()
@@ -143,8 +162,11 @@ class PlaybookDashboard(QWidget):
                 padding: 8px;
             }
         """)
-        self._log.setFixedHeight(160)
-        detail_layout.addWidget(self._log)
+        splitter.addWidget(self._log)
+
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 2)
+        detail_layout.addWidget(splitter, 1)
 
         # Buttons
         btn_layout = QHBoxLayout()
@@ -185,8 +207,23 @@ class PlaybookDashboard(QWidget):
         """)
         self._stop_btn.clicked.connect(self._on_stop)
 
+        self._clear_btn = QPushButton("Clear")
+        self._clear_btn.setFixedWidth(80)
+        self._clear_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #666;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 6px 16px;
+                font-size: 13px;
+            }
+        """)
+        self._clear_btn.clicked.connect(self._on_clear)
+
         btn_layout.addWidget(self._run_btn)
         btn_layout.addWidget(self._stop_btn)
+        btn_layout.addWidget(self._clear_btn)
         btn_layout.addStretch()
         detail_layout.addLayout(btn_layout)
 
@@ -217,6 +254,7 @@ class PlaybookDashboard(QWidget):
         self._desc_label.clear()
         self._cwd_label.clear()
         self._log.clear()
+        self._current_file_path = ""
         self._clear_step_labels()
         self._clear_param_fields()
 
@@ -225,6 +263,29 @@ class PlaybookDashboard(QWidget):
             self._steps_layout.removeWidget(label)
             label.deleteLater()
         self._step_labels = []
+
+    def _load_saved_params(self, file_path: str) -> dict:
+        try:
+            with open(_PARAMS_CACHE) as f:
+                return json.load(f).get(file_path, {})
+        except (FileNotFoundError, json.JSONDecodeError):
+            return {}
+
+    def _save_params(self, file_path: str, values: dict):
+        try:
+            with open(_PARAMS_CACHE) as f:
+                cache = json.load(f)
+        except (FileNotFoundError, json.JSONDecodeError):
+            cache = {}
+        cache[file_path] = values
+        os.makedirs(os.path.dirname(_PARAMS_CACHE), exist_ok=True)
+        with open(_PARAMS_CACHE, "w") as f:
+            json.dump(cache, f, indent=2)
+
+    def _display_log(self, file_path: str):
+        self._log.clear()
+        for line in self._playbook_logs.get(file_path, []):
+            self._log.append(line)
 
     def _clear_param_fields(self):
         for _name, widget in self._param_fields:
@@ -240,88 +301,131 @@ class PlaybookDashboard(QWidget):
         if row < 0 or row >= len(self._playbooks):
             return
         pb = self._playbooks[row]
+        self._current_file_path = pb.get("file_path", "")
         self._name_label.setText(pb["name"])
         self._desc_label.setText(pb.get("description", ""))
         self._cwd_label.setText(f"cwd: {pb.get('cwd', '')}")
-        self._log.clear()
+        self._display_log(self._current_file_path)
 
         self._clear_param_fields()
+        saved = self._load_saved_params(pb.get("file_path", ""))
         for param in pb.get("params", []):
             lbl = QLabel(param["label"])
             lbl.setStyleSheet("font-size: 12px; color: #aaa;")
             field = QLineEdit()
-            field.setText(param.get("default", ""))
+            field.setText(saved.get(param["name"], param.get("default", "")))
             field.setStyleSheet("font-size: 13px; padding: 4px;")
             self._params_layout.addWidget(lbl)
             self._params_layout.addWidget(field)
             self._param_fields.append((param["name"], field))
 
         self._clear_step_labels()
-        for step in pb["steps"]:
-            lbl = QLabel(f"  \u25CB  {step['name']}")
+        saved_states = self._playbook_step_states.get(self._current_file_path)
+        for i, step in enumerate(pb["steps"]):
+            if saved_states and i < len(saved_states):
+                icon, color = saved_states[i]
+            else:
+                icon, color = "\u25CB", "#888"
+            lbl = QLabel(f"  {icon}  {step['name']}")
             lbl.setFont(QFont("Helvetica Neue", 13))
-            lbl.setStyleSheet("color: #888;")
-            # Insert before the stretch
+            lbl.setStyleSheet(f"color: {color};")
             self._steps_layout.insertWidget(self._steps_layout.count() - 1, lbl)
             self._step_labels.append(lbl)
+
+        self._update_buttons()
 
     def _on_run(self):
         row = self._list.currentRow()
         if row < 0 or row >= len(self._playbooks):
             return
 
-        if self._runner is not None and self._runner.isRunning():
+        pb = self._playbooks[row]
+        fp = pb.get("file_path", "")
+
+        # Don't start if this playbook already has a running runner
+        if fp in self._runners and self._runners[fp].isRunning():
             return
 
-        # Reset step icons
+        # Reset step states for this playbook
+        n_steps = len(pb["steps"])
+        self._playbook_step_states[fp] = [
+            ("\u25CB", "#888") for _ in range(n_steps)
+        ]
         for lbl in self._step_labels:
             step_name = lbl.text().split("  ", 2)[-1]
             lbl.setText(f"  \u25CB  {step_name}")
             lbl.setStyleSheet("color: #888;")
         self._log.clear()
+        self._playbook_logs[fp] = []
 
-        pb = self._playbooks[row]
         env_overrides = {name: field.text() for name, field in self._param_fields}
-        self._runner = PlaybookRunner(pb, env_overrides=env_overrides, parent=self)
-        self._runner.step_started.connect(self._on_step_started)
-        self._runner.step_finished.connect(self._on_step_finished)
-        self._runner.log_line.connect(self._on_log_line)
-        self._runner.playbook_finished.connect(self._on_playbook_finished)
+        if env_overrides:
+            self._save_params(fp, env_overrides)
 
-        self._run_btn.setEnabled(False)
-        self._stop_btn.setEnabled(True)
-        self._runner.start()
+        runner = PlaybookRunner(pb, env_overrides=env_overrides, parent=self)
+        runner.step_started.connect(lambda i, n, _fp=fp: self._on_step_started(_fp, i, n))
+        runner.step_finished.connect(lambda i, s, _fp=fp: self._on_step_finished(_fp, i, s))
+        runner.log_line.connect(lambda t, _fp=fp: self._on_log_line(_fp, t))
+        runner.playbook_finished.connect(lambda s, _fp=fp: self._on_playbook_finished(_fp, s))
+        self._runners[fp] = runner
+
+        self._update_buttons()
+        runner.start()
 
     def _on_stop(self):
-        if self._runner is not None:
-            self._runner.stop()
+        runner = self._runners.get(self._current_file_path)
+        if runner is not None:
+            runner.stop()
 
-    def _on_step_started(self, index, name):
-        if 0 <= index < len(self._step_labels):
-            lbl = self._step_labels[index]
-            lbl.setText(f"  \u25B6  {name}")
-            lbl.setStyleSheet("color: #007AFF;")
-
-    def _on_step_finished(self, index, success):
-        if 0 <= index < len(self._step_labels):
-            lbl = self._step_labels[index]
+    def _on_clear(self):
+        self._playbook_logs[self._current_file_path] = []
+        self._log.clear()
+        # Reset step labels to pending
+        self._playbook_step_states.pop(self._current_file_path, None)
+        for lbl in self._step_labels:
             step_name = lbl.text().split("  ", 2)[-1]
-            if success:
-                lbl.setText(f"  \u2713  {step_name}")
-                lbl.setStyleSheet("color: #34C759;")
-            else:
-                lbl.setText(f"  \u2717  {step_name}")
-                lbl.setStyleSheet("color: #FF3B30;")
+            lbl.setText(f"  \u25CB  {step_name}")
+            lbl.setStyleSheet("color: #888;")
 
-    def _on_log_line(self, text):
-        self._log.append(text)
-        # Auto-scroll
-        scrollbar = self._log.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+    def _update_buttons(self):
+        runner = self._runners.get(self._current_file_path)
+        running = runner is not None and runner.isRunning()
+        self._run_btn.setEnabled(not running)
+        self._stop_btn.setEnabled(running)
 
-    def _on_playbook_finished(self, success):
-        self._run_btn.setEnabled(True)
-        self._stop_btn.setEnabled(False)
+    def _on_step_started(self, file_path, index, name):
+        states = self._playbook_step_states.get(file_path)
+        if states and 0 <= index < len(states):
+            states[index] = ("\u25B6", "#007AFF")
+        if file_path == self._current_file_path:
+            if 0 <= index < len(self._step_labels):
+                lbl = self._step_labels[index]
+                lbl.setText(f"  \u25B6  {name}")
+                lbl.setStyleSheet("color: #007AFF;")
+
+    def _on_step_finished(self, file_path, index, success):
+        icon = "\u2713" if success else "\u2717"
+        color = "#34C759" if success else "#FF3B30"
+        states = self._playbook_step_states.get(file_path)
+        if states and 0 <= index < len(states):
+            states[index] = (icon, color)
+        if file_path == self._current_file_path:
+            if 0 <= index < len(self._step_labels):
+                lbl = self._step_labels[index]
+                step_name = lbl.text().split("  ", 2)[-1]
+                lbl.setText(f"  {icon}  {step_name}")
+                lbl.setStyleSheet(f"color: {color};")
+
+    def _on_log_line(self, file_path, text):
+        self._playbook_logs.setdefault(file_path, []).append(text)
+        if file_path == self._current_file_path:
+            self._log.append(text)
+            scrollbar = self._log.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+
+    def _on_playbook_finished(self, file_path, success):
+        if file_path == self._current_file_path:
+            self._update_buttons()
 
     def show_at(self, x, y):
         self.move(x, y)

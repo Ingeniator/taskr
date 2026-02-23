@@ -1,9 +1,13 @@
+import json
+import os
+
 import pytest
 
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeyEvent
 
+import ui.playbook_dashboard as pd
 from ui.playbook_dashboard import PlaybookDashboard
 
 
@@ -130,3 +134,47 @@ class TestPlaybookDashboard:
         w._list.setCurrentRow(0)  # Deploy (no params)
         qapp.processEvents()
         assert len(w._param_fields) == 0
+
+    def test_saved_params_restored_on_selection(self, qapp, tmp_path, monkeypatch):
+        cache_file = str(tmp_path / "playbook_params.json")
+        monkeypatch.setattr(pd, "_PARAMS_CACHE", cache_file)
+
+        # Pre-populate saved params
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, "w") as f:
+            json.dump({"/tmp/playbooks/test.yml": {"VERBOSE": "1"}}, f)
+
+        w = PlaybookDashboard()
+        w.load_playbooks(SAMPLE_PLAYBOOKS)
+
+        w._list.setCurrentRow(1)  # Test Suite
+        qapp.processEvents()
+
+        # Should use saved "1" instead of default "0"
+        assert w._param_fields[0][1].text() == "1"
+
+    def test_params_saved_on_run(self, qapp, tmp_path, monkeypatch):
+        cache_file = str(tmp_path / "playbook_params.json")
+        monkeypatch.setattr(pd, "_PARAMS_CACHE", cache_file)
+
+        w = PlaybookDashboard()
+        w.load_playbooks(SAMPLE_PLAYBOOKS)
+
+        w._list.setCurrentRow(1)  # Test Suite
+        qapp.processEvents()
+
+        # Change the field value
+        w._param_fields[0][1].setText("42")
+
+        # Trigger run (will fail to actually run but should save params)
+        w._on_run()
+        # Stop immediately
+        fp = SAMPLE_PLAYBOOKS[1]["file_path"]
+        runner = w._runners.get(fp)
+        if runner:
+            runner.stop()
+            runner.wait(2000)
+
+        with open(cache_file) as f:
+            cache = json.load(f)
+        assert cache["/tmp/playbooks/test.yml"]["VERBOSE"] == "42"
