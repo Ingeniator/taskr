@@ -436,7 +436,7 @@ class CtrlLord(QWidget):
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         x = (screen.width() - self._dashboard.width()) // 2
-        y = int(screen.height() * 0.2) + self.height() + 10
+        y = int(screen.height() * 0.1) + self.height() + 10
         self._dashboard.show_at(x, y)
 
     @Slot()
@@ -460,7 +460,7 @@ class CtrlLord(QWidget):
 
         screen = QGuiApplication.primaryScreen().availableGeometry()
         x = (screen.width() - self._playbook_dashboard.width()) // 2
-        y = int(screen.height() * 0.2) + self.height() + 10
+        y = int(screen.height() * 0.1) + self.height() + 10
         self._playbook_dashboard.show_at(x, y)
 
     @Slot()
