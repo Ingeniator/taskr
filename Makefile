@@ -1,16 +1,20 @@
 APP_NAME=CtrlLord
+VENV=.venv
+PIP=$(VENV)/bin/pip
+PYTHON=$(VENV)/bin/python
 PLIST_SOURCE=./com.ingeniator.ctrllord.plist
 PLIST_DEST=$(HOME)/Library/LaunchAgents/com.ingeniator.ctrllord.plist
 
 .PHONY: test install reinstall uninstall clean nuke
 
 test:
-	@uv run pytest tests/ -v
+	@$(PYTHON) -m pytest tests/ -v
 
 install:
 	@echo "📦 Installing $(APP_NAME) as Python package..."
-	@uv pip install -e .
-	@CTRLLORD_BIN=$$(uv run which ctrllord) && \
+	@test -d $(VENV) || python3 -m venv $(VENV)
+	@$(PIP) install -e .
+	@CTRLLORD_BIN=$$($(PYTHON) -c "import shutil; print(shutil.which('ctrllord'))") && \
 	echo "Found ctrllord at: $$CTRLLORD_BIN" && \
 	sed "s|__CTRLLORD_BIN__|$$CTRLLORD_BIN|g" "$(PLIST_SOURCE)" > "$(PLIST_DEST)"
 	@plutil -lint "$(PLIST_DEST)" || (echo "❌ Invalid .plist file" && false)
@@ -26,7 +30,7 @@ uninstall:
 	@echo "🗑️  Uninstalling $(APP_NAME)..."
 	@launchctl bootout gui/$(shell id -u) "$(PLIST_DEST)" 2>/dev/null || true
 	@rm -f "$(PLIST_DEST)"
-	@uv pip uninstall taskr 2>/dev/null || true
+	@$(PIP) uninstall -y taskr 2>/dev/null || true
 	@echo "✅ Uninstalled $(APP_NAME) package and LaunchAgent."
 
 clean:

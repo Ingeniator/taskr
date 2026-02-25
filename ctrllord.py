@@ -85,13 +85,11 @@ def main():
         logger.info("Another instance is already running.")
         sys.exit(0)
 
-    if not is_process_trusted():
-        logger.warning("Accessibility permissions not granted.")
-        show_permission_dialog()
-        open_accessibility_settings()
-        sys.exit(1)
-    else:
+    trusted = is_process_trusted()
+    if trusted:
         logger.info("Accessibility permission granted.")
+    else:
+        logger.warning("Accessibility permissions not granted. Running in tray-only mode (no hotkeys).")
 
     signal.signal(signal.SIGTSTP, signal.SIG_IGN)
 
@@ -118,42 +116,44 @@ def main():
         # Run GUI method from non-GUI thread safely
         QMetaObject.invokeMethod(launcher, "show_launcher", Qt.QueuedConnection)
 
-    # Start hotkey listener in thread
-    if hotkey == "double_cmd":
-        DOUBLE_TAP_INTERVAL = 0.3  # seconds
+    # Start hotkey listener in thread (requires Accessibility permissions)
+    if trusted:
+        if hotkey == "double_cmd":
+            DOUBLE_TAP_INTERVAL = 0.3  # seconds
 
-        def listener():
-            last_cmd_release = 0.0
-            other_key_pressed = False
+            def listener():
+                last_cmd_release = 0.0
+                other_key_pressed = False
 
-            def on_press(key):
-                nonlocal other_key_pressed
-                if key not in (keyboard.Key.cmd, keyboard.Key.cmd_r):
-                    other_key_pressed = True
+                def on_press(key):
+                    nonlocal other_key_pressed
+                    if key not in (keyboard.Key.cmd, keyboard.Key.cmd_r):
+                        other_key_pressed = True
 
-            def on_release(key):
-                nonlocal last_cmd_release, other_key_pressed
-                if key in (keyboard.Key.cmd, keyboard.Key.cmd_r):
-                    now = time.monotonic()
-                    if not other_key_pressed and (now - last_cmd_release) < DOUBLE_TAP_INTERVAL:
-                        last_cmd_release = 0.0
-                        trigger_launcher()
-                    else:
-                        last_cmd_release = now
-                    other_key_pressed = False
+                def on_release(key):
+                    nonlocal last_cmd_release, other_key_pressed
+                    if key in (keyboard.Key.cmd, keyboard.Key.cmd_r):
+                        now = time.monotonic()
+                        if not other_key_pressed and (now - last_cmd_release) < DOUBLE_TAP_INTERVAL:
+                            last_cmd_release = 0.0
+                            trigger_launcher()
+                        else:
+                            last_cmd_release = now
+                        other_key_pressed = False
 
-            with keyboard.Listener(on_press=on_press, on_release=on_release) as h:
-                h.join()
+                with keyboard.Listener(on_press=on_press, on_release=on_release) as h:
+                    h.join()
+        else:
+            def listener():
+                with keyboard.GlobalHotKeys({
+                    hotkey: trigger_launcher
+                }) as h:
+                    h.join()
+
+        threading.Thread(target=listener, daemon=True).start()
+        logger.info("Hotkey is ready: %s", hotkey)
     else:
-        def listener():
-            with keyboard.GlobalHotKeys({
-                hotkey: trigger_launcher
-            }) as h:
-                h.join()
-
-    threading.Thread(target=listener, daemon=True).start()
-
-    logger.info("Hotkey is ready: %s", hotkey)
+        logger.info("Tray-only mode: use the menu bar icon to open the launcher.")
     sys.exit(app.exec())
 
 
